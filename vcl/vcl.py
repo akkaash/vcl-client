@@ -34,45 +34,61 @@ def test(config, string, url, username, password):
     response = config.api.test(string)
     click.echo(response)
 
-@cli.command()
-@click.option('--list', is_flag=True, flag_value=True, help='list available images')
+@cli.group()
+@pass_config
+def image(config):
+    pass
+
+@image.command()
+@pass_config
 @click.argument('url')
 @click.argument('username')
 @click.password_option(help='password for VCL site')
-@pass_config
-def image(config, list, url, username, password):
+def list(config, url, username, password):
     make_config(config, url, username, password)
-    if list:
-        response = config.api.get_images()
-        click.echo(response)
+    response = config.api.get_images()
+    click.echo(response)
 
-@cli.command()
-@click.option('--add', help='add request', is_flag=True, flag_value=True)
+
+@cli.group()
+@pass_config
+def request(config):
+    pass
+
+@request.command()
 @click.option('--image-id', type=click.INT, help='image ID for request')
 @click.option('--start', help='unix timestamp for request start time')
 @click.option('--length', type=click.INT, help='length of request in 15 minute increments')
-@click.option('--end', help='end request', is_flag=True, flag_value=True)
-@click.option('--request-id', help='request ID', type=click.INT)
-@click.option('--list', is_flag=True, flag_value=True)
 @click.argument('url')
 @click.argument('username')
 @click.password_option(help='password for VCL site')
 @pass_config
-def request(config, add, image_id, start, length,\
-        end, request_id, \
-        list, \
-        url, username, password):
+def add(config, image_id, start, length, url, username, password):
+    make_config(url, username, password)
+    if start is None:
+        start = "now"
+    if length is None:
+        length = 15
+    response = config.api.add_request(image_id, start, length)
+    click.echo(response)
+
+@request.command()
+@pass_config
+@click.option('--request-id', help='request ID', type=click.INT)
+@click.argument('url')
+@click.argument('username')
+@click.password_option(help='password for VCL site')
+def end(config, request_id):
     make_config(config, url, username, password)
-    if add:
-        if start is None:
-            start = "now"
-        if length is None:
-            length = 15
-        response = config.api.add_request(image_id, start, length)
-        click.echo(response)
-    elif end:
-        response = config.api.end_request(request_id)
-        click.echo(response)
-    elif list:
-        response = config.api.get_requestIds()
-        click.echo(response)
+    response = config.api.end_request(request_id)
+    click.echo(response)
+
+@request.command()
+@pass_config
+@click.argument('url')
+@click.argument('username')
+@click.password_option(help='password for VCL site')
+def list(config, url, username, password):
+    make_config(config, url, username, password)
+    response = config.api.get_requestIds()
+    click.echo(response)
