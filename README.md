@@ -22,3 +22,6 @@ Commands:
   request
   test
 ```
+
+### Thank You
+I would like to thank Josh Thompson for providing some seed code for VCLServerProxy and VCLTransport. 
