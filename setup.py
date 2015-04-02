@@ -20,8 +20,8 @@ setup(name='vcl',
         ### Required to build documentation
         # "Sphinx >= 1.0",
         ### Required for testing
-        # "nose",
-        # "coverage",
+        "nose",
+        "coverage",
 	    'click'
         ],
     setup_requires=[],
