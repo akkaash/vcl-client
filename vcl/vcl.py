@@ -50,11 +50,13 @@ def image(config, list, url, username):
 @click.option('--length', type=click.INT, help='length of request in 15 minute increments')
 @click.option('--end', help='end request', is_flag=True, flag_value=True)
 @click.option('--request-id', help='request ID', type=click.INT)
+@click.option('--list', is_flag=True, flag_value=True)
 @click.argument('url')
 @click.argument('username')
 @pass_config
 def request(config, add, image_id, start, length,\
         end, request_id, \
+        list, \
         url, username):
     make_config(config, url, username)
     if add:
@@ -64,6 +66,9 @@ def request(config, add, image_id, start, length,\
             length = 15
         response = config.api.add_request(image_id, start, length)
         click.echo(response)
-    if end:
+    elif end:
         response = config.api.end_request(request_id)
+        click.echo(response)
+    elif list:
+        response = config.api.get_requestIds()
         click.echo(response)
