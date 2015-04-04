@@ -61,18 +61,19 @@ def request(config):
 @click.option('--image-id', type=click.INT, help='image ID for request')
 @click.option('--start', help='unix timestamp for request start time')
 @click.option('--length', type=click.INT, help='length of request in 15 minute increments')
+@click.option('--count', type=click.INT, help='number of requests', default=1)
 @click.argument('url')
 @click.argument('username')
 @click.password_option(help='password for VCL site')
 @pass_config
-def add(config, image_id, start, length, url, username, password):
+def add(config, image_id, start, length, count, url, username, password):
     make_config(config, url, username, password)
     if start is None:
         start = "now"
     if length is None:
         length = 15
-    response = config.api.add_request(image_id, start, length)
-    click.echo(response)
+    for response in config.api.add_request(image_id, start, length, count):
+        click.echo(response)
 
 @request.command()
 @pass_config

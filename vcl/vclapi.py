@@ -20,9 +20,11 @@ class VCLApi(object):
         rc = self.client.XMLRPCgetImages()
         return rc
 
-    def add_request(self, image_id, start, length):
-        rc = self.client.XMLRPCaddRequest(image_id, start, length)
-        return rc
+    def add_request(self, image_id, start, length, count):
+        requests = range(count)
+        for i in requests:
+            rc = self.client.XMLRPCaddRequest(image_id, start, length)
+            yield rc
 
     def end_request(self, request_id):
         return self.client.XMLRPCendRequest(request_id)
