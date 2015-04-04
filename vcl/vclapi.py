@@ -32,3 +32,6 @@ class VCLApi(object):
 
     def get_request_status(self, request_id):
         return self.client.XMLRPCgetRequestStatus(request_id)
+
+    def get_request_connect_data(self, request_id, remote_ip):
+        return self.client.XMLRPCgetRequestConnectData(request_id, remote_ip)

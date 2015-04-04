@@ -1,5 +1,7 @@
 import click
 import getpass
+import time
+import urllib
 from vclapi import VCLApi
 
 class Config(object):
@@ -12,9 +14,9 @@ class Config(object):
 pass_config = click.make_pass_decorator(Config, ensure=True)
 
 def make_config(config, url, username, password):
-    config.url = url
-    config.username = username
-    config.password = password
+    config.url = str(url).strip()
+    config.username = str(username).strip()
+    config.password = str(password).strip()
     config.api = VCLApi(config.url, config.username, config.password)
 
 @click.group()
@@ -74,11 +76,11 @@ def add(config, image_id, start, length, url, username, password):
 
 @request.command()
 @pass_config
-@click.option('--request-id', help='request ID', type=click.INT)
+@click.argument('request-id')
 @click.argument('url')
 @click.argument('username')
 @click.password_option(help='password for VCL site')
-def end(config, request_id):
+def end(config, request_id, url, username, password):
     make_config(config, url, username, password)
     response = config.api.end_request(request_id)
     click.echo(response)
@@ -102,4 +104,28 @@ def list(config, url, username, password):
 def status(config, request_id, url, username, password):
     make_config(config, url, username, password)
     response = config.api.get_request_status(request_id)
+    click.echo(response)
+
+@request.command()
+@pass_config
+@click.option('--remote-ip', help='IP address of connecting user')
+@click.argument('request-id')
+@click.argument('url')
+@click.argument('username')
+@click.password_option(help='password for VCL site')
+def connect(config, remote_ip, request_id, url, username, password):
+    make_config(config, url, username, password)
+    # check reservation status
+    response = config.api.get_request_status(request_id)
+    while response['status'] == 'loading':
+        click.echo('request %d is loading' % int(request_id))
+        click.echo('est. load time: %d' % int(response['time']))
+        click.echo('will retry in %d' % int(response['time']))
+        time.sleep(response['time'] * 60)
+        response = config.api.get_request_status(request_id)
+        click.echo(response)
+    if remote_ip is None:
+        remote_ip = urllib.urlopen('http://myip.dnsomatic.com/').read().strip()
+        click.echo(remote_ip)
+    response = config.api.get_request_connect_data(request_id, remote_ip)
     click.echo(response)
