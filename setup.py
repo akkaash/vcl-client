@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 import sys, os
 
 setup(name='vcl',
-    version='0.1',
+    version='0.2',
     description="VCL Client",
     long_description="VCL Client",
     classifiers=[],
