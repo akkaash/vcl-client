@@ -64,7 +64,7 @@ def request(config):
 @click.password_option(help='password for VCL site')
 @pass_config
 def add(config, image_id, start, length, url, username, password):
-    make_config(url, username, password)
+    make_config(config, url, username, password)
     if start is None:
         start = "now"
     if length is None:
@@ -91,4 +91,15 @@ def end(config, request_id):
 def list(config, url, username, password):
     make_config(config, url, username, password)
     response = config.api.get_requestIds()
+    click.echo(response)
+
+@request.command()
+@pass_config
+@click.argument('request-id')
+@click.argument('url')
+@click.argument('username')
+@click.password_option(help='password for VCL site')
+def status(config, request_id, url, username, password):
+    make_config(config, url, username, password)
+    response = config.api.get_request_status(request_id)
     click.echo(response)
