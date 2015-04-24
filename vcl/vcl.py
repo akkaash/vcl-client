@@ -1,5 +1,4 @@
 import getpass
-from vcl_serverproxy import VCLServerProxy
 import xmlrpclib
 
 
