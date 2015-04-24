@@ -27,7 +27,7 @@ setup(name='vcl',
     setup_requires=[],
     entry_points="""
         [console_scripts]
-        vcl=vcl.vcl:cli
+        vcl=vcl:cli
     """,
     namespace_packages=[],
     )
