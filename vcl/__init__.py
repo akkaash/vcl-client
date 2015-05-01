@@ -71,7 +71,10 @@ def add(config, image_id, start, length, count, url, username, password):
     if start is None:
         start = "now"
     if length is None:
-        length = 15
+        length = 60
+    if count is None:
+        count = 1
+    if
     for response in config.api.add_request(image_id, start, length, count):
         click.echo(response)
 
