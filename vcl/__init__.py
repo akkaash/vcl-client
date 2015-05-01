@@ -74,9 +74,10 @@ def add(config, image_id, start, length, count, url, username, password):
         length = 60
     if count is None:
         count = 1
-    if
-    for response in config.api.add_request(image_id, start, length, count):
-        click.echo(response)
+    try:
+        config.api.add_request(image_id, start, length, count)
+    except Exception, e:
+        exit(code=1)
 
 @request.command()
 @pass_config

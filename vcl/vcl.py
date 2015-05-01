@@ -1,14 +1,30 @@
 import getpass
 import xmlrpclib
+import urllib
+import logging
+import logging.config
+
+import errors
+
+LOG = logging.getLogger(__name__)
+LOG.setLevel(level=logging.DEBUG)
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+formatter = logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+ch.setFormatter(formatter)
+LOG.addHandler(ch)
 
 
 class VCL(object):
+
     def __init__(self, url, username, password):
         self.url = url
         self.username = username
         self.password = password
         self.verbose = 0
-        self.client = VCLServerProxy(self.url, self.username, self.password, verbose=0)
+        self.client = VCLServerProxy(
+            self.url, self.username, self.password, verbose=0)
 
     def test(self, test_string):
         # client = VCLServerProxy(self.url, self.username, self.password, verbose=0)
@@ -16,15 +32,22 @@ class VCL(object):
         return rc
 
     def get_images(self):
-        client = VCLServerProxy(self.url, self.username, self.password, verbose=0)
+        client = VCLServerProxy(
+            self.url, self.username, self.password, verbose=0)
         rc = self.client.XMLRPCgetImages()
         return rc
 
     def add_request(self, image_id, start, length, count):
-        requests = range(count)
-        for i in requests:
-            rc = self.client.XMLRPCaddRequest(image_id, start, length)
-            yield rc
+        logger = logging.getLogger("add_request")
+        try:
+            for i in range(count):
+                rc = self.client.XMLRPCaddRequest(image_id, start, length)
+                LOG.debug(msg=rc)
+        except errors.VCLError, e:
+            LOG.error("Error Code: {1} Message: {0} ".format(e, e.error_code))
+            raise e
+        finally:
+            pass
 
     def end_request(self, request_id):
         return self.client.XMLRPCendRequest(request_id)
@@ -119,18 +142,19 @@ class VCLTransport(xmlrpclib.SafeTransport):
             resp = xmlrpclib.loads(resp)[0]
         except xmlrpclib.Fault, err:
             if err.faultCode == 3:
-                print "ERROR: Received '%s' error. " \
-                      "The credentials you supplied to log in to the VCL site were not accepted." % err.faultString
+                raise errors.VCLError(
+                    err.faultString, err.faultCode)
             elif err.faultCode == 4:
-                print "ERROR: %s" % err.faultString
+                LOG.error("%s" % err.faultString)
             elif err.faultCode == 5:
-                print "ERROR: Received '%s' error. " \
-                      "The VCL site could not establish a connection with your authentication server." % err.faultString
+                LOG.error("Received '%s' error. "
+                          "The VCL site could not establish a connection with your authentication server." % err.faultString)
             elif err.faultCode == 6:
-                print "ERROR: Received '%s' error. " \
-                      "The VCL site could not determine a method to use to authenticate the supplied user." \
-                      % err.faultString
+                LOG.error("Received '%s' error. "
+                          "The VCL site could not determine a method to use to authenticate the supplied user."
+                          % err.faultString)
             else:
-                print "ERROR: Received '%s' error from VCL site." % err.faultString
+                LOG.error("ERROR: Received '%s' error from VCL site." %
+                          err.faultString)
 
         return resp
