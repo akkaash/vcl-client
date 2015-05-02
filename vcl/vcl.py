@@ -5,6 +5,7 @@ import logging
 import logging.config
 
 import errors
+import response
 
 LOG = logging.getLogger(__name__)
 LOG.setLevel(level=logging.DEBUG)
@@ -39,15 +40,24 @@ class VCL(object):
 
     def add_request(self, image_id, start, length, count):
         logger = logging.getLogger("add_request")
-        try:
-            for i in range(count):
+        responses = []
+        for i in range(count):
+            try:
                 rc = self.client.XMLRPCaddRequest(image_id, start, length)
                 LOG.debug(msg=rc)
-        except errors.VCLError, e:
-            LOG.error("Error Code: {1} Message: {0} ".format(e, e.error_code))
-            raise e
-        finally:
-            pass
+                if rc['status'] == "success":
+                    responses.append(response.VCLRequestResponse(
+                                     status=rc['status'],
+                                     request_id=rc['requestid']))
+                elif rc['status'] == "error":
+                    raise errors.VCLError(message=rc['errormsg'],
+                                          error_code=rc['errorcode'])
+            except errors.VCLError, e:
+                LOG.error("Error Code: {1} Message: {0} ".format(e, e.error_code))
+                responses.append(response.VCLErrorResponse(status="error",
+                                 error_code=e.error_code,
+                                 error_message=e))
+        return responses
 
     def end_request(self, request_id):
         return self.client.XMLRPCendRequest(request_id)

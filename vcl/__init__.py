@@ -3,6 +3,7 @@ import getpass
 import time
 import urllib
 from vcl import VCL
+from vcl import response
 
 class Config(object):
     def __init__(self):
@@ -74,10 +75,15 @@ def add(config, image_id, start, length, count, url, username, password):
         length = 60
     if count is None:
         count = 1
-    try:
-        config.api.add_request(image_id, start, length, count)
-    except Exception, e:
-        exit(code=1)
+    vcl_responses = config.api.add_request(image_id, start, length, count)
+    for vcl_response in vcl_responses:
+        if isinstance(vcl_response, response.VCLRequestResponse):
+            click.echo("{0}: {1}".format(vcl_response.vcl_response.status,
+                   vcl_response.request_id))
+        elif isinstance(vcl_response, response.VCLErrorResponse):
+            click.echo("{0}: {1}".format(vcl_response.vcl_response.status,
+                       vcl_response.error_message))
+
 
 @request.command()
 @pass_config
