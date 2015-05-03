@@ -87,14 +87,15 @@ def add(config, image_id, start, length, count, url, username, password):
 
 @request.command()
 @pass_config
-@click.argument('request-id')
-@click.argument('url')
-@click.argument('username')
+@click.argument('url', nargs=1)
+@click.argument('username', nargs=1)
+@click.option('--request-id', multiple=True, type=click.INT)
 @click.password_option(help='password for VCL site')
-def end(config, request_id, url, username, password):
+def end(config, url, username, request_id, password):
     make_config(config, url, username, password)
-    response = config.api.end_request(request_id)
-    click.echo(response)
+    for req_id in request_id:
+        response = config.api.end_request(req_id)
+        click.echo(response)
 
 @request.command()
 @pass_config

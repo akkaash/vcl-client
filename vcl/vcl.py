@@ -38,7 +38,16 @@ class VCL(object):
         rc = self.client.XMLRPCgetImages()
         return rc
 
-    def add_request(self, image_id, start, length, count):
+    def add_request(self, image_id=None, start="now", length=60, count=1):
+        if image_id is None or not isinstance(image_id, int):
+            raise ValueError("image_id expected to be integer")
+        if start != "now" and not isinstance(start, int):
+            raise ValueError(
+                "start time should be 'now' or integer UNIX timestamp")
+        if length < 0:
+            raise ValueError("reservation length cannot be negative")
+        if count <= 0:
+            return
         logger = logging.getLogger("add_request")
         responses = []
         for i in range(count):
@@ -53,14 +62,32 @@ class VCL(object):
                     raise errors.VCLError(message=rc['errormsg'],
                                           error_code=rc['errorcode'])
             except errors.VCLError, e:
-                LOG.error("Error Code: {1} Message: {0} ".format(e, e.error_code))
+                LOG.error(
+                    "Error Code: {1} Message: {0} ".format(e, e.error_code))
                 responses.append(response.VCLErrorResponse(status="error",
-                                 error_code=e.error_code,
-                                 error_message=e))
+                                                           error_code=e.error_code,
+                                                           error_message=e.message))
         return responses
 
     def end_request(self, request_id):
-        return self.client.XMLRPCendRequest(request_id)
+        ret = None
+        if request_id < 0:
+            raise ValueError("request id should be positive")
+        try:
+            rc = self.client.XMLRPCendRequest(request_id)
+            if rc['status'] == "success":
+                ret = response.VCLResponse(rc['status'])
+            else:
+                raise errors.VCLError(message=rc['errormsg'],
+                                      error_code=rc['errorcode'])
+        except errors.VCLError, e:
+            LOG.error(
+                msg="Error Code: {1} Message: {0}".format(e, e.error_code))
+            ret = response.VCLErrorResponse(status="error",
+                                            error_code=e.error_code,
+                                            error_message=e.message)
+        finally:
+            return ret
 
     def get_requestIds(self):
         return self.client.XMLRPCgetRequestIds()
@@ -83,8 +110,11 @@ class VCLServerProxy(xmlrpclib.ServerProxy):
         # establish a "logical" server connection
 
         # get the url
-        type, uri = urllib.splittype(uri)
-        if type not in ("http", "https"):
+        protocol_type, uri = urllib.splittype(uri)
+        if protocol_type not in ("http", "https"):
+            LOG.error(msg="input URL: {0}".format(uri))
+            LOG.error(
+                msg="{0}: unsupported XML-RPC protocol".format(protocol_type))
             raise IOError, "unsupported XML-RPC protocol"
         self.__host, self.__handler = urllib.splithost(uri)
         if not self.__handler:

@@ -32,6 +32,10 @@ class VCLErrorResponse(object):
         self._error_message = error_message
 
     @property
+    def error_code(self):
+        return self._error_code
+
+    @property
     def error_message(self):
         return self._error_message
 
@@ -39,5 +43,8 @@ class VCLErrorResponse(object):
     def vcl_response(self):
         return self._vcl_response
 
-
+    def __repr__(self):
+        return str({"status":self.vcl_response,
+                   "error_code": self.error_code,
+                   "error_message": self.error_message})
 
