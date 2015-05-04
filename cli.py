@@ -97,7 +97,7 @@ def add(config, image_id, start, length, count, url, username, password):
 @pass_config
 @click.argument('url', nargs=1)
 @click.argument('username', nargs=1)
-@click.option('--request-id', multiple=True, type=click.INT)
+@click.option('--request-id', multiple=True, type=click.INT, help="id of request to end")
 @click.password_option(help='password for VCL site')
 def end(config, url, username, request_id, password):
     make_config(config, url, username, password)
