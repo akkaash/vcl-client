@@ -1,143 +1,200 @@
-import click
 import getpass
-import time
+import xmlrpclib
 import urllib
-from vcl import VCL
-from vcl import response
+import logging
+import logging.config
 
-class Config(object):
-    def __init__(self):
-        self.url = None
-        self.username = None
-        self.password = None
-        self.api = None
+import errors
+import response
 
-pass_config = click.make_pass_decorator(Config, ensure=True)
-
-def make_config(config, url, username, password):
-    config.url = str(url).strip()
-    config.username = str(username).strip()
-    config.password = str(password).strip()
-    config.api = VCL(config.url, config.username, config.password)
-
-@click.group()
-@click.version_option()
-@pass_config
-def cli(config):
-    pass
-
-@cli.command()
-@click.option('--string', help='string to send to VCL Site', default='Hello World!')
-@click.argument('url')
-@click.argument('username')
-@click.password_option(help='password for VCL site')
-@pass_config
-def test(config, string, url, username, password):
-    make_config(config, url, username, password)
-    response = config.api.test(string)
-    click.echo(response)
-
-@cli.group()
-@pass_config
-def image(config):
-    pass
-
-@image.command()
-@pass_config
-@click.argument('url')
-@click.argument('username')
-@click.password_option(help='password for VCL site')
-def list(config, url, username, password):
-    make_config(config, url, username, password)
-    response = config.api.get_images()
-    click.echo(response)
+LOG = logging.getLogger(__name__)
+LOG.setLevel(level=logging.DEBUG)
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+formatter = logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+ch.setFormatter(formatter)
+LOG.addHandler(ch)
 
 
-@cli.group()
-@pass_config
-def request(config):
-    pass
+class VCL(object):
 
-@request.command()
-@click.option('--image-id', type=click.INT, help='image ID for request')
-@click.option('--start', help='unix timestamp for request start time')
-@click.option('--length', type=click.INT, help='length of request in 15 minute increments')
-@click.option('--count', type=click.INT, help='number of requests', default=1)
-@click.argument('url')
-@click.argument('username')
-@click.password_option(help='password for VCL site')
-@pass_config
-def add(config, image_id, start, length, count, url, username, password):
-    make_config(config, url, username, password)
-    if start is None:
-        start = "now"
-    if length is None:
-        length = 60
-    if count is None:
-        count = 1
-    vcl_responses = config.api.add_request(image_id, start, length, count)
-    for vcl_response in vcl_responses:
-        if isinstance(vcl_response, response.VCLRequestResponse):
-            click.echo("{0}: {1}".format(vcl_response.vcl_response.status,
-                   vcl_response.request_id))
-        elif isinstance(vcl_response, response.VCLErrorResponse):
-            click.echo("{0}: {1}".format(vcl_response.vcl_response.status,
-                       vcl_response.error_message))
+    def __init__(self, url, username, password):
+        self.url = url
+        self.username = username
+        self.password = password
+        self.verbose = 0
+        self.client = VCLServerProxy(
+            self.url, self.username, self.password, verbose=0)
+
+    def test(self, test_string):
+        # client = VCLServerProxy(self.url, self.username, self.password, verbose=0)
+        rc = self.client.XMLRPCtest(test_string)
+        return rc
+
+    def get_images(self):
+        client = VCLServerProxy(
+            self.url, self.username, self.password, verbose=0)
+        rc = self.client.XMLRPCgetImages()
+        return rc
+
+    def add_request(self, image_id=None, start="now", length=60, count=1):
+        if image_id is None or not isinstance(image_id, int):
+            raise ValueError("image_id expected to be integer")
+        if start != "now" and not isinstance(start, int):
+            raise ValueError(
+                "start time should be 'now' or integer UNIX timestamp")
+        if length < 0:
+            raise ValueError("reservation length cannot be negative")
+        if count <= 0:
+            return
+        logger = logging.getLogger("add_request")
+        responses = []
+        for i in range(count):
+            try:
+                rc = self.client.XMLRPCaddRequest(image_id, start, length)
+                LOG.debug(msg=rc)
+                if rc['status'] == "success":
+                    responses.append(response.VCLRequestResponse(
+                                     status=rc['status'],
+                                     request_id=rc['requestid']))
+                elif rc['status'] == "error":
+                    raise errors.VCLError(message=rc['errormsg'],
+                                          error_code=rc['errorcode'])
+            except errors.VCLError, e:
+                LOG.error(
+                    "Error Code: {1} Message: {0} ".format(e, e.error_code))
+                responses.append(response.VCLErrorResponse(status="error",
+                                                           error_code=e.error_code,
+                                                           error_message=e.message))
+        return responses
+
+    def end_request(self, request_id):
+        ret = None
+        if request_id < 0:
+            raise ValueError("request id should be positive")
+        try:
+            rc = self.client.XMLRPCendRequest(request_id)
+            if rc['status'] == "success":
+                ret = response.VCLResponse(rc['status'])
+            else:
+                raise errors.VCLError(message=rc['errormsg'],
+                                      error_code=rc['errorcode'])
+        except errors.VCLError, e:
+            LOG.error(
+                msg="Error Code: {1} Message: {0}".format(e, e.error_code))
+            ret = response.VCLErrorResponse(status="error",
+                                            error_code=e.error_code,
+                                            error_message=e.message)
+        finally:
+            return ret
+
+    def get_requestIds(self):
+        return self.client.XMLRPCgetRequestIds()
+
+    def get_request_status(self, request_id):
+        return self.client.XMLRPCgetRequestStatus(request_id)
+
+    def get_request_connect_data(self, request_id, remote_ip):
+        return self.client.XMLRPCgetRequestConnectData(request_id, remote_ip)
 
 
-@request.command()
-@pass_config
-@click.argument('url', nargs=1)
-@click.argument('username', nargs=1)
-@click.option('--request-id', multiple=True, type=click.INT)
-@click.password_option(help='password for VCL site')
-def end(config, url, username, request_id, password):
-    make_config(config, url, username, password)
-    for req_id in request_id:
-        response = config.api.end_request(req_id)
-        click.echo(response)
+class VCLServerProxy(xmlrpclib.ServerProxy):
+    __userid = ''
+    __passwd = ''
 
-@request.command()
-@pass_config
-@click.argument('url')
-@click.argument('username')
-@click.password_option(help='password for VCL site')
-def list(config, url, username, password):
-    make_config(config, url, username, password)
-    response = config.api.get_requestIds()
-    click.echo(response)
+    def __init__(self, uri, userid, passwd, transport=None, encoding=None,
+                 verbose=0, allow_none=0, use_datetime=0):
+        self.__userid = userid
+        self.__passwd = passwd
+        # establish a "logical" server connection
 
-@request.command()
-@pass_config
-@click.argument('request-id')
-@click.argument('url')
-@click.argument('username')
-@click.password_option(help='password for VCL site')
-def status(config, request_id, url, username, password):
-    make_config(config, url, username, password)
-    response = config.api.get_request_status(request_id)
-    click.echo(response)
+        # get the url
+        protocol_type, uri = urllib.splittype(uri)
+        if protocol_type not in ("http", "https"):
+            LOG.error(msg="input URL: {0}".format(uri))
+            LOG.error(
+                msg="{0}: unsupported XML-RPC protocol".format(protocol_type))
+            raise IOError, "unsupported XML-RPC protocol"
+        self.__host, self.__handler = urllib.splithost(uri)
+        if not self.__handler:
+            self.__handler = "/RPC2"
+        if transport is None:
+            transport = VCLTransport()
+        self.__transport = transport
+        self.__encoding = encoding
+        self.__verbose = verbose
+        self.__allow_none = allow_none
 
-@request.command()
-@pass_config
-@click.option('--remote-ip', help='IP address of connecting user')
-@click.argument('request-id')
-@click.argument('url')
-@click.argument('username')
-@click.password_option(help='password for VCL site')
-def connect(config, remote_ip, request_id, url, username, password):
-    make_config(config, url, username, password)
-    # check reservation status
-    response = config.api.get_request_status(request_id)
-    while response['status'] == 'loading':
-        click.echo('request %d is loading' % int(request_id))
-        click.echo('est. load time: %d' % int(response['time']))
-        click.echo('will retry in %d' % int(response['time']))
-        time.sleep(response['time'] * 60)
-        response = config.api.get_request_status(request_id)
-        click.echo(response)
-    if remote_ip is None:
-        remote_ip = urllib.urlopen('http://myip.dnsomatic.com/').read().strip()
-        click.echo(remote_ip)
-    response = config.api.get_request_connect_data(request_id, remote_ip)
-    click.echo(response)
+    def __request(self, method_name, params):
+        request = xmlrpclib.dumps(params, method_name, encoding=self.__encoding,
+                                  allow_none=self.__allow_none)
+        response = self.__transport.request(
+            self.__host,
+            self.__userid,
+            self.__passwd,
+            self.__handler,
+            request,
+            verbose=self.__verbose
+        )
+        if len(response) == 1:
+            response = response[0]
+        return response
+
+    def __getattr__(self, name):
+        return xmlrpclib._Method(self.__request, name)
+
+
+class VCLTransport(xmlrpclib.SafeTransport):
+    ##
+    # Send a complete request, and parse the response.
+    #
+    # @param host Target host.
+    # @param handler Target PRC handler.
+    # @param request_body XML-RPC request body.
+    # @param verbose Debugging flag.
+    # @return Parsed response.
+
+    def request(self, host, userid, passwd, handler, request_body, verbose=0):
+        # issue XML-RPC request
+
+        h = self.make_connection(host)
+        if verbose:
+            h.set_debuglevel(1)
+        self.send_request(h, handler, request_body)
+        h.putheader('X-APIVERSION', '2')
+        h.putheader('X-User', userid)
+        h.putheader('X-Pass', passwd)
+        self.send_host(h, host)
+        self.send_user_agent(h)
+        self.send_content(h, request_body)
+        response = h.getresponse()
+        errcode, errmsg, headers = response.status, response.msg, response.getheaders()
+        if errcode != 200:
+            raise xmlrpclib.ProtocolError(
+                host + handler,
+                errcode, errmsg,
+                headers
+            )
+        self.verbose = verbose
+        resp = response.read()
+        try:
+            resp = xmlrpclib.loads(resp)[0]
+        except xmlrpclib.Fault, err:
+            if err.faultCode == 3:
+                raise errors.VCLError(
+                    err.faultString, err.faultCode)
+            elif err.faultCode == 4:
+                LOG.error("%s" % err.faultString)
+            elif err.faultCode == 5:
+                LOG.error("Received '%s' error. "
+                          "The VCL site could not establish a connection with your authentication server." % err.faultString)
+            elif err.faultCode == 6:
+                LOG.error("Received '%s' error. "
+                          "The VCL site could not determine a method to use to authenticate the supplied user."
+                          % err.faultString)
+            else:
+                LOG.error("ERROR: Received '%s' error from VCL site." %
+                          err.faultString)
+
+        return resp
