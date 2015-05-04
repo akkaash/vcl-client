@@ -9,7 +9,7 @@ import request
 
 
 LOG = logging.getLogger(__name__)
-LOG.setLevel(level=logging.DEBUG)
+LOG.setLevel(level=logging.INFO)
 ch = logging.StreamHandler()
 ch.setLevel(logging.DEBUG)
 formatter = logging.Formatter(
@@ -19,6 +19,7 @@ LOG.addHandler(ch)
 
 
 class VCL(object):
+
     def __init__(self, url, username, password):
         self.url = url
         self.username = username
@@ -92,29 +93,51 @@ class VCL(object):
         res = []
         try:
             rc = self.client.XMLRPCgetRequestIds()
+            LOG.debug(msg=rc)
             if rc['status'] == "success":
+                LOG.debug(msg="success")
                 for req in rc['requests']:
+                    LOG.debug(msg="request: {}".format(req))
                     res.append(request.VCLRequest(
                         request_id=req['requestid'],
                         image_id=req['imageid'],
                         image_name=req['imagename'],
                         start=req['start'],
                         end=req['end'],
-                        OS=req['OS'],
-                        is_server=req['isserver'],
+                        os=req['OS'],
+                        is_server=True if req['isserver'] == 1 else False,
                         state=req['state'],
-                        server_name=req['servername']))
+                        server_name=req['servername'] if req['isserver'] else None))
         except errors.VCLError, e:
             LOG.error(
                 msg="Error Code: {1} Message: {0}".format(e, e.error_code))
             res = response.VCLErrorResponse(status="error",
                                             error_code=e.error_code,
                                             error_message=e.message)
+        except Exception, e:
+            raise e
         finally:
             return res
 
     def get_request_status(self, request_id):
-        return self.client.XMLRPCgetRequestStatus(request_id)
+        res = None
+        try:
+            rc = self.client.XMLRPCgetRequestStatus(request_id)
+            if rc['status'] == "loading":
+                res = response.VCLResponse(status=rc['status'],
+                                           time=rc['time'])
+            elif rc['status'] == "error":
+                raise errors.VCLError(message=rc['errormsg'],
+                                      error_code=rc['errorcode'])
+            else:
+                res = response.VCLResponse(status=rc['status'])
+        except errors.VCLError, e:
+            LOG.error(msg="{0} {1}".format(request_id, e.message))
+            res = response.VCLErrorResponse(status="error",
+                                            error_code=e.faultCode,
+                                            error_message=e.message)
+        finally:
+            return res
 
     def get_request_connect_data(self, request_id, remote_ip):
         return self.client.XMLRPCgetRequestConnectData(request_id, remote_ip)
@@ -202,20 +225,23 @@ class VCLTransport(xmlrpclib.SafeTransport):
         try:
             resp = xmlrpclib.loads(resp)[0]
         except xmlrpclib.Fault, err:
-            if err.faultCode == 3:
-                raise errors.VCLError(
-                    err.faultString, err.faultCode)
-            elif err.faultCode == 4:
-                LOG.error("%s" % err.faultString)
-            elif err.faultCode == 5:
-                LOG.error("Received '%s' error. "
-                          "The VCL site could not establish a connection with your authentication server." % err.faultString)
-            elif err.faultCode == 6:
-                LOG.error("Received '%s' error. "
-                          "The VCL site could not determine a method to use to authenticate the supplied user."
-                          % err.faultString)
-            else:
-                LOG.error("ERROR: Received '%s' error from VCL site." %
-                          err.faultString)
+            # if err.faultCode == 3:
+            #     raise errors.VCLError(
+            #         err.faultString, err.faultCode)
+            # elif err.faultCode == 4:
+            #     LOG.error("%s" % err.faultString)
+            # elif err.faultCode == 5:
+            #     LOG.error("Received '%s' error. "
+            #               "The VCL site could not establish a connection with your authentication server." % err.faultString)
+            # elif err.faultCode == 6:
+            #     LOG.error("Received '%s' error. "
+            #               "The VCL site could not determine a method to use to authenticate the supplied user."
+            #               % err.faultString)
+            # else:
+            #     LOG.error("ERROR: Received '%s' error from VCL site." %
+            #               err.faultString)
+
+            raise errors.VCLError(message=err.faultString,
+                                  error_code=err.faultCode)
 
         return resp

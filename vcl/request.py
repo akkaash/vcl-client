@@ -8,7 +8,7 @@ class VCLRequest(object):
                  os=None,
                  is_server=False,
                  state=None,
-                 server_name=None):
+                 **kwargs):
         self._request_id = request_id
         self._image_id = image_id
         self._image_name = image_name
@@ -17,7 +17,7 @@ class VCLRequest(object):
         self._OS = os
         self._is_server = is_server
         self._state = state
-        self._server_name = server_name
+        self._server_name = kwargs['server_name']
 
     @property
     def request_id(self):

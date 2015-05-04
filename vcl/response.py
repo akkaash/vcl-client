@@ -1,14 +1,20 @@
 class VCLResponse(object):
 
-    def __init__(self, status=None):
+    def __init__(self, status=None, **kwargs):
         self._status = status
+        if self._status == "loading":
+            self._time = kwargs['time']
 
     @property
     def status(self):
         return self._status
 
     def __repr__(self):
-        return "%s(status=%r)" % self.__class__, self.status
+        if self.status == "loading":
+            return "%s(status=%r, time=%r)" % (self.__class__,
+                                               self.status,
+                                               self._time)
+        return "%s(status=%r)" % (self.__class__, self.status)
 
 
 class VCLRequestResponse(object):

@@ -114,20 +114,24 @@ def end(config, url, username, request_id, password):
 def list(config, url, username, password):
     make_config(config, url, username, password)
     res = config.api.get_request_ids()
-    for res in res:
-        click.echo(res)
-
+    if isinstance(res, response.VCLErrorResponse):
+        click.echo(message=res.error_message)
+        exit(1)
+    else:
+        for r in res:
+            click.echo(r)
 
 @request.command()
 @pass_config
-@click.argument('request-id')
+@click.option('--request-id', multiple=True)
 @click.argument('url')
 @click.argument('username')
 @click.password_option(help='password for VCL site')
 def status(config, request_id, url, username, password):
     make_config(config, url, username, password)
-    response = config.api.get_request_status(request_id)
-    click.echo(response)
+    for req_id in request_id:
+        response = config.api.get_request_status(req_id)
+        click.echo(response)
 
 
 @request.command()
