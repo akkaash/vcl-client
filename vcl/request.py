@@ -1,10 +1,11 @@
 class VCLRequest(object):
+
     def __init__(self, request_id=None,
                  image_id=None,
                  image_name=None,
                  start=None,
                  end=None,
-                 OS=None,
+                 os=None,
                  is_server=False,
                  state=None,
                  server_name=None):
@@ -13,7 +14,7 @@ class VCLRequest(object):
         self._image_name = image_name
         self._start = start
         self._end = end
-        self._OS = OS
+        self._OS = os
         self._is_server = is_server
         self._state = state
         self._server_name = server_name
@@ -53,3 +54,9 @@ class VCLRequest(object):
     @property
     def server_name(self):
         return self._server_name
+
+    def __repr__(self):
+        return "%s(request_id=%r, image_id=%r, image_name=%r, start=%r, end=%r, OS=%r, is_server=%r, state=%r, server_name=%r)" \
+            % (self.__class__, self.request_id, self.image_id, self.image_name,
+               self.start, self.end, self.OS, self.is_server,
+               self.state, self.server_name)

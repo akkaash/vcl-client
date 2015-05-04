@@ -1,4 +1,5 @@
 class VCLResponse(object):
+
     def __init__(self, status=None):
         self._status = status
 
@@ -7,9 +8,11 @@ class VCLResponse(object):
         return self._status
 
     def __repr__(self):
-        return self.status
+        return "%s(status=%r)" % self.__class__, self.status
+
 
 class VCLRequestResponse(object):
+
     def __init__(self, status, request_id):
         self._vcl_response = VCLResponse(status)
         self._request_id = request_id
@@ -23,9 +26,11 @@ class VCLRequestResponse(object):
         return self._vcl_response
 
     def __repr__(self):
-        return str({"status":self.vcl_response, "request_id": self.request_id})
+        return "%s(vcl_response=%r, request_id=%r)" % (self.__class__, self.vcl_response, self.request_id)
+
 
 class VCLErrorResponse(object):
+
     def __init__(self, status, error_code, error_message):
         self._vcl_response = VCLResponse(status)
         self._error_code = error_code
@@ -44,7 +49,5 @@ class VCLErrorResponse(object):
         return self._vcl_response
 
     def __repr__(self):
-        return str({"status":self.vcl_response,
-                   "error_code": self.error_code,
-                   "error_message": self.error_message})
-
+        return "%s(vcl_response=%r, error_code=%r, error_message=%r)" % (
+            self.__class__, self.vcl_response, self.error_code, self.error_message)

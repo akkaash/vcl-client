@@ -1,4 +1,3 @@
-import getpass
 import xmlrpclib
 import urllib
 import logging
@@ -6,6 +5,8 @@ import logging.config
 
 import errors
 import response
+import request
+
 
 LOG = logging.getLogger(__name__)
 LOG.setLevel(level=logging.DEBUG)
@@ -18,7 +19,6 @@ LOG.addHandler(ch)
 
 
 class VCL(object):
-
     def __init__(self, url, username, password):
         self.url = url
         self.username = username
@@ -48,7 +48,6 @@ class VCL(object):
             raise ValueError("reservation length cannot be negative")
         if count <= 0:
             return
-        logger = logging.getLogger("add_request")
         responses = []
         for i in range(count):
             try:
@@ -56,8 +55,8 @@ class VCL(object):
                 LOG.debug(msg=rc)
                 if rc['status'] == "success":
                     responses.append(response.VCLRequestResponse(
-                                     status=rc['status'],
-                                     request_id=rc['requestid']))
+                        status=rc['status'],
+                        request_id=rc['requestid']))
                 elif rc['status'] == "error":
                     raise errors.VCLError(message=rc['errormsg'],
                                           error_code=rc['errorcode'])
@@ -89,8 +88,30 @@ class VCL(object):
         finally:
             return ret
 
-    def get_requestIds(self):
-        return self.client.XMLRPCgetRequestIds()
+    def get_request_ids(self):
+        res = []
+        try:
+            rc = self.client.XMLRPCgetRequestIds()
+            if rc['status'] == "success":
+                for req in rc['requests']:
+                    res.append(request.VCLRequest(
+                        request_id=req['requestid'],
+                        image_id=req['imageid'],
+                        image_name=req['imagename'],
+                        start=req['start'],
+                        end=req['end'],
+                        OS=req['OS'],
+                        is_server=req['isserver'],
+                        state=req['state'],
+                        server_name=req['servername']))
+        except errors.VCLError, e:
+            LOG.error(
+                msg="Error Code: {1} Message: {0}".format(e, e.error_code))
+            res = response.VCLErrorResponse(status="error",
+                                            error_code=e.error_code,
+                                            error_message=e.message)
+        finally:
+            return res
 
     def get_request_status(self, request_id):
         return self.client.XMLRPCgetRequestStatus(request_id)
