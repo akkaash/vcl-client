@@ -1,5 +1,6 @@
 import time
 import urllib
+import datetime
 
 import click
 from vcl import response
@@ -118,8 +119,15 @@ def list(config, url, username, password):
         click.echo(message=res.error_message)
         exit(1)
     else:
+        req_str = "{0} {1} {2} {3}".format("Request ID", "Image Name",
+                                           "Start", "End")
+        click.echo(req_str)
         for r in res:
-            click.echo(r)
+            req_str = "{0} {1} {2} {3}".format(r.request_id,
+                                               r.image_name,
+                                               datetime.datetime.fromtimestamp(r.start).strftime('%Y-%m-%d %H:%M:%S'),
+                                               datetime.datetime.fromtimestamp(r.end).strftime('%Y-%m-%d %H:%M:%S'))
+            click.echo(req_str)
 
 @request.command()
 @pass_config
